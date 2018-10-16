@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+
+require 'json'
+require 'net/http'
+require 'uri'
+
+
+#################################################################
+#														    
+#	You'll need to visit the menu page for your store to grab the	    
+#	link to the JSON menu. I did this in Chrome by pressing F12,	    
+#	moving to the Network tab on the top pane, and refreshing the  
+#	page. You'll see the bottom left pane populate with items, 	     
+#	in this list, you need to find an entry like this:
+#	
+#	menu_items?page=1&page_size=20
+#
+#	Right click on that entry in the list, copy the link address,
+#	and paste as the value for $the_url below. 
+#
+#	You'll want to at least take a cursory read through this,
+#	as there's a fair amount more information than I made use of.
+#
+##################################################################
+
+
+
+
+
+$the_url = ""
+
+
+
+
+
+
+
+uri = URI.parse($the_url)
+data = JSON.parse(Net::HTTP.get_response(uri).body)
+
+# Setup the menu as an array 
+items = data['data']['menu_items'].to_a
+
+# Setup a hash to organize the different strains by qualities
+# I'd intended to use it somehow, but haven't so far. 
+strains = {}
+
+#	THC format is ["Name", maximum THC:CBD ratio]
+#	CBD format is ["Name", minimum THC:CBD ratio]
+indica_best_thc = ["",100000]
+indica_best_cbd = ["",0]
+hybrid_best_thc = ["",100000]
+hybrid_best_cbd = ["",0]
+sativa_best_thc = ["",100000]
+sativa_best_cbd = ["",0]
+
+#Step through the strains
+items.each do |strain|
+	#	My store doesn't use the menu properly, so I have to do some text processing
+	#	you may need to do much less work, but you'll have to walk through the JSON yourself
+	params = strain['name'].split("(")	
+	category = strain['category']['name'].downcase
+	name = params[0].chomp+" (#{category})"
+	price_per_gram = ['prices']['gram'][0]['price']	# My store has a flat rate per gram, I didn't use this
+	begin
+		constits = params[1].gsub("(","").split(" ")
+	rescue
+		constits = []
+	end
+	thc =  constits[1].to_f
+	cbd =  constits[3].to_f
+	ratio = ((cbd/thc)*100.0).round(3)
+	case category
+		when "sativa"
+			if ratio<sativa_best_thc[1]
+				sativa_best_thc[1] = ratio
+				sativa_best_thc[0] = name
+			end
+			if ratio>sativa_best_cbd[1]
+				sativa_best_cbd[1] = ratio
+				sativa_best_cbd[0] = name
+			end
+		when "indica"
+			if ratio<indica_best_thc[1]
+				indica_best_thc[1] = ratio
+				indica_best_thc[0] = name
+			end
+			if ratio>indica_best_cbd[1]
+				indica_best_cbd[1] = ratio
+				indica_best_cbd[0] = name
+			end
+		when "hybrid"
+			if ratio<hybrid_best_thc[1]
+				hybrid_best_thc[1] = ratio
+				hybrid_best_thc[0] = name
+			end
+			if ratio>hybrid_best_cbd[1]
+				hybrid_best_cbd[1] = ratio
+				hybrid_best_cbd[0] = name
+			end
+		end
+	strains[name] = {:thc=>thc,:cdb=>cbd,:ratio=>ratio}
+	
+end
+print("\n\n\n\r")
+print("\n\n\rINDICA\n")
+print("#{indica_best_thc[0]} @ #{indica_best_thc[1]}\n")
+print("#{indica_best_cbd[0]} @ #{indica_best_cbd[1]}\n")
+
+print("\n\n\rSATIVA\n")
+print("#{sativa_best_thc[0]} @ #{sativa_best_thc[1]}\n")
+print("#{sativa_best_cbd[0]} @ #{sativa_best_cbd[1]}\n")
+
+print("\n\n\rHYBRID\n")
+print("#{hybrid_best_thc[0]} @ #{hybrid_best_thc[1]}\n")
+print("#{hybrid_best_cbd[0]} @ #{hybrid_best_cbd[1]}\n")
